@@ -137,7 +137,7 @@ static void app_signal_sel(App *a, i32 sig, const char *name)
     }
 }
 
-static void app_header(App *a, i32 nshow, f32 dt)
+static void app_header(App *a, i32 nshow)
 {
     gc_ui_panel(a->ui, (GCRECT){16.0f, 16.0f, 1248.0f, 88.0f}, C_PANEL);
 
@@ -151,10 +151,8 @@ static void app_header(App *a, i32 nshow, f32 dt)
         (unsigned long long)a->sys.mem_total_kb / 1024ULL);
 
     i32 up = (i32)a->sys.uptime_s;
-    app_textf(a, 800.0f, 24.0f, 440.0f, 28.0f, C_DIM, "up %d:%02d:%02d  tasks %d/%d",
+    app_textf(a, 800.0f, 24.0f, 440.0f, 28.0f, C_DIM, "up %d:%02d:%02d - tasks %d/%d",
         up / 3600, (up % 3600) / 60, up % 60, nshow, a->nproc);
-    app_textf(a, 800.0f, 52.0f, 440.0f, 28.0f, C_DIM, "dt %.1f ms  fps %.0f",
-        (f64)(dt * 1000.0f), dt > 0.0f ? (f64)(1.0f / dt) : 0.0);
 }
 
 static void app_toolbar(App *a, i32 nshow)
@@ -287,7 +285,7 @@ static void app_frame(App *a)
     app_resnapshot(a, dt);
     i32 nshow = app_filter(a);
 
-    app_header(a, nshow, dt);
+    app_header(a, nshow);
     app_toolbar(a, nshow);
     app_sortbar(a);
     app_body(a, nshow, 208.0f, 408.0f);
