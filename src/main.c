@@ -6,6 +6,8 @@
 #include <stdarg.h>
 #include <string.h>
 #include <signal.h>
+#include <float.h>
+
 
 #define WIN_W 1280
 #define WIN_H 720
@@ -163,7 +165,12 @@ static void app_toolbar(App *a, i32 nshow)
     gc_ui_textbox(a->ui, (GCRECT){100.0f, 118.0f, 300.0f, 36.0f}, &a->filter, &a->filter_cap, a->arena);
 
     app_label(a, 430.0f, 120.0f, 90.0f, 28.0f, "Refresh", C_TEXT);
-    gc_ui_slider(a->ui, (GCRECT){520.0f, 122.0f, 160.0f, 24.0f}, 0.2f, 3.0f, &a->refresh);
+    gc_ui_slider(a->ui, (GCRECT){520.0f, 122.0f, 160.0f, 24.0f}, 0.2f, 100.0f, &a->refresh);
+
+    if (app_button(a, 750.0f, 120.0f, 100.0f, 28.0f, "Max")) {
+        a->refresh = 100.0f;
+    }
+    
     app_textf(a, 688.0f, 120.0f, 80.0f, 28.0f, C_DIM, "%.1fs", (f64)a->refresh);
 
     app_textf(a, 1140.0f, 120.0f, 100.0f, 28.0f, C_DIM, "shown %d", nshow);
