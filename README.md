@@ -1,6 +1,6 @@
 # gproc
 
-Linux graphical task manager on `../gcui`.
+Linux graphical task manager based on `gcui`.
 
 ```sh
 make
