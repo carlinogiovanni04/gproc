@@ -23,31 +23,31 @@ static const f32 col_x[COL_N] = {24.0f, 112.0f, 210.0f, 328.0f};
 static const f32 col_w[COL_N] = {88.0f, 98.0f, 118.0f, 920.0f};
 
 static const char *col_names[COL_N] = {"PID", "CPU%", "MEM", "NAME"};
-static const i32 col_keys[COL_N] = {PROC_SORT_PID, PROC_SORT_CPU, PROC_SORT_MEM, PROC_SORT_NAME};
+static const i32   col_keys[COL_N]  = {PROC_SORT_PID, PROC_SORT_CPU, PROC_SORT_MEM, PROC_SORT_NAME};
 
 typedef struct {
     GCARENA  *arena;
     GCWINDOW *window;
     GCUI     *ui;
 
-    Proc     procs[PROC_MAX];
-    i32      order[PROC_MAX];
-    i32      nproc;
-    SysInfo  sys;
+    Proc    procs[PROC_MAX];
+    i32     order[PROC_MAX];
+    i32     nproc;
+    SysInfo sys;
 
-    char     *filter;
-    GCUSIZE  filter_cap;
+    char   *filter;
+    GCUSIZE filter_cap;
 
-    i32      sort_key;
-    b32      sort_desc;
-    i32      sel;
+    i32 sort_key;
+    b32 sort_desc;
+    i32 sel;
 
-    f32      scroll;
-    f32      refresh;
-    f32      timer;
+    f32 scroll;
+    f32 refresh;
+    f32 timer;
 
-    char     status[128];
-    char     line[256];
+    char status[128];
+    char line[256];
 } App;
 
 static App app; //NOTE(Giovanni): global for now
@@ -111,7 +111,7 @@ static void app_pick_sort(App *a, i32 key)
     if (a->sort_key == key) {
         a->sort_desc = !a->sort_desc;
     } else {
-        a->sort_key = key;
+        a->sort_key  = key;
         a->sort_desc = (key == PROC_SORT_CPU || key == PROC_SORT_MEM);
     }
     proc_sort(a->procs, a->nproc, a->sort_key, a->sort_desc);
@@ -146,12 +146,12 @@ static void app_header(App *a, i32 nshow)
     gc_ui_progress(a->ui, (GCRECT){32.0f, 58.0f, 300.0f, 16.0f}, a->sys.mem_pct / 100.0f);
     u64 mem_used = a->sys.mem_total_kb - a->sys.mem_avail_kb;
     app_textf(a, 340.0f, 52.0f, 420.0f, 28.0f, C_TEXT, "MEM %.1f%% %llu/%llu MB",
-        (f64)a->sys.mem_pct, (unsigned long long)mem_used / 1024ULL,
-        (unsigned long long)a->sys.mem_total_kb / 1024ULL);
+              (f64)a->sys.mem_pct, (unsigned long long)mem_used / 1024ULL,
+              (unsigned long long)a->sys.mem_total_kb / 1024ULL);
 
     i32 up = (i32)a->sys.uptime_s;
-    app_textf(a, 800.0f, 24.0f, 440.0f, 28.0f, C_DIM, "up %d:%02d:%02d - tasks %d/%d",
-        up / 3600, (up % 3600) / 60, up % 60, nshow, a->nproc);
+    app_textf(a, 800.0f, 24.0f, 440.0f, 28.0f, C_DIM, "up %d:%02d:%02d - tasks %d/%d", up / 3600,
+              (up % 3600) / 60, up % 60, nshow, a->nproc);
 }
 
 static void app_toolbar(App *a, i32 nshow)
@@ -159,7 +159,8 @@ static void app_toolbar(App *a, i32 nshow)
     gc_ui_panel(a->ui, (GCRECT){16.0f, 112.0f, 1248.0f, 48.0f}, C_PANEL);
 
     app_label(a, 32.0f, 120.0f, 70.0f, 28.0f, "Filter", C_TEXT);
-    gc_ui_textbox(a->ui, (GCRECT){100.0f, 118.0f, 300.0f, 36.0f}, &a->filter, &a->filter_cap, a->arena);
+    gc_ui_textbox(a->ui, (GCRECT){100.0f, 118.0f, 300.0f, 36.0f}, &a->filter, &a->filter_cap,
+                  a->arena);
 
     app_label(a, 430.0f, 120.0f, 90.0f, 28.0f, "Refresh", C_TEXT);
     gc_ui_slider(a->ui, (GCRECT){520.0f, 122.0f, 160.0f, 24.0f}, 0.2f, 100.0f, &a->refresh);
@@ -167,7 +168,7 @@ static void app_toolbar(App *a, i32 nshow)
     if (app_button(a, 750.0f, 120.0f, 100.0f, 28.0f, "Max")) {
         a->refresh = 100.0f;
     }
-    
+
     app_textf(a, 688.0f, 120.0f, 80.0f, 28.0f, C_DIM, "%.1fs", (f64)a->refresh);
 
     app_textf(a, 1140.0f, 120.0f, 100.0f, 28.0f, C_DIM, "shown %d", nshow);
@@ -190,8 +191,8 @@ static void app_sortbar(App *a)
 
 static void app_row(App *a, Proc *p, f32 y)
 {
-    GCRECT row = {24.0f, y, 1232.0f, ROW_H};
-    GCB32 inside = gc_rect_contains(row, a->ui->mouseX, a->ui->mouseY);
+    GCRECT row    = {24.0f, y, 1232.0f, ROW_H};
+    GCB32  inside = gc_rect_contains(row, a->ui->mouseX, a->ui->mouseY);
 
     if (p->pid == a->sel) {
         gc_draw_fill(a->window, row, C_SEL);
@@ -212,25 +213,39 @@ static void app_body(App *a, i32 nshow, f32 body_y, f32 body_h)
 {
     gc_ui_panel(a->ui, (GCRECT){16.0f, body_y, 1248.0f, body_h}, C_BODY);
 
-    i32 vis = (i32)(body_h / ROW_H);
-    i32 max_first = (nshow > vis) ? nshow - vis : 0;
+    i32 vis        = (i32)(body_h / ROW_H);
+    i32 max_first  = (nshow > vis) ? nshow - vis : 0;
     f32 max_scroll = (f32)max_first * ROW_H;
 
     app_clamp_scroll(a, max_scroll);
-    if (gc_window_key_was_pressed(a->window, GC_KEY_PAGEDOWN)) { a->scroll += (f32)vis * ROW_H; }
-    if (gc_window_key_was_pressed(a->window, GC_KEY_PAGEUP)) { a->scroll -= (f32)vis * ROW_H; }
-    if (gc_window_key_was_pressed(a->window, GC_KEY_HOME)) { a->scroll = 0.0f; }
-    if (gc_window_key_was_pressed(a->window, GC_KEY_END)) { a->scroll = max_scroll; }
+    if (gc_window_key_was_pressed(a->window, GC_KEY_PAGEDOWN)) {
+        a->scroll += (f32)vis * ROW_H;
+    }
+    if (gc_window_key_was_pressed(a->window, GC_KEY_PAGEUP)) {
+        a->scroll -= (f32)vis * ROW_H;
+    }
+    if (gc_window_key_was_pressed(a->window, GC_KEY_HOME)) {
+        a->scroll = 0.0f;
+    }
+    if (gc_window_key_was_pressed(a->window, GC_KEY_END)) {
+        a->scroll = max_scroll;
+    }
 
     app_clamp_scroll(a, max_scroll);
 
     i32 first = (i32)(a->scroll / ROW_H);
-    if (first > max_first) { first = max_first; }
+    if (first > max_first) {
+        first = max_first;
+    }
 
     i32 last = first + vis;
-    if (last > nshow) {  last = nshow; }
-    
-    for (i32 vi = first; vi < last; vi++) { app_row(a, &a->procs[a->order[vi]], body_y + (f32)(vi - first) * ROW_H); }
+    if (last > nshow) {
+        last = nshow;
+    }
+
+    for (i32 vi = first; vi < last; vi++) {
+        app_row(a, &a->procs[a->order[vi]], body_y + (f32)(vi - first) * ROW_H);
+    }
 
     gc_ui_slider(a->ui, (GCRECT){24.0f, 620.0f, 1232.0f, 20.0f}, 0.0f, max_scroll, &a->scroll);
 }
@@ -253,14 +268,14 @@ static void app_footer(App *a)
 
 static b32 app_init(App *a)
 {
-    a->sort_key = PROC_SORT_CPU;
+    a->sort_key  = PROC_SORT_CPU;
     a->sort_desc = true;
-    a->sel = -1;
-    a->refresh = 0.5f;
-    a->timer = 1e9f;
+    a->sel       = -1;
+    a->refresh   = 0.5f;
+    a->timer     = 1e9f;
     snprintf(a->status, sizeof(a->status), "ready");
 
-    a->arena = gc_arena_create(GC_MB(2));
+    a->arena  = gc_arena_create(GC_MB(2));
     a->window = gc_window_create(a->arena, "gproc", WIN_W, WIN_H, GC_FALSE);
     if (!a->window) {
         gc_arena_destroy(a->arena);

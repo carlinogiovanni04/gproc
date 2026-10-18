@@ -4,10 +4,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
-typedef int8_t   i8;
-typedef int16_t  i16;
-typedef int32_t  i32;
-typedef int64_t  i64;
+typedef int8_t  i8;
+typedef int16_t i16;
+typedef int32_t i32;
+typedef int64_t i64;
 
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -191,8 +191,8 @@ header_implementation u64 proc__cpu_total(u64 *idle_out)
     }
     fclose(f);
     unsigned long v[10] = {0};
-    int n = sscanf(line, "cpu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu",
-        &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9]);
+    int n = sscanf(line, "cpu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu", &v[0], &v[1], &v[2], &v[3],
+                   &v[4], &v[5], &v[6], &v[7], &v[8], &v[9]);
     if (n < 4) {
         return 0;
     }
@@ -250,7 +250,7 @@ header_implementation b32 proc_snapshot(Proc *procs, i32 *count, SysInfo *sys)
     /* NOTE: libc file io here; gcui already links libc/SDL, so no raw-syscall layer. */
     sys->mem_total_kb = 0;
     sys->mem_avail_kb = 0;
-    FILE *mf = fopen("/proc/meminfo", "r");
+    FILE *mf          = fopen("/proc/meminfo", "r");
     if (mf) {
         char line[256];
         while (fgets(line, sizeof(line), mf)) {
@@ -268,7 +268,7 @@ header_implementation b32 proc_snapshot(Proc *procs, i32 *count, SysInfo *sys)
     sys->mem_pct = sys->mem_total_kb ? 100.0f * (f32)used / (f32)sys->mem_total_kb : 0.0f;
 
     sys->uptime_s = 0.0;
-    FILE *uf = fopen("/proc/uptime", "r");
+    FILE *uf      = fopen("/proc/uptime", "r");
     if (uf) {
         double up = 0.0;
         if (fscanf(uf, "%lf", &up) == 1) {
@@ -287,9 +287,9 @@ header_implementation b32 proc_snapshot(Proc *procs, i32 *count, SysInfo *sys)
     if (!d) {
         return false;
     }
-    i32 n = 0;
-    char path[64];
-    char buf[640];
+    i32            n = 0;
+    char           path[64];
+    char           buf[640];
     struct dirent *e;
     while ((e = readdir(d)) != NULL && n < PROC_MAX) {
         if (!proc__is_pid(e->d_name)) {
