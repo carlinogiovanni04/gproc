@@ -1,6 +1,6 @@
 CompileFlags:
   Add:
     - "-std=c11"
-    - "-ID:/code/gproc/include"
-    - "-ID:/code/gcui/include"
-    - "-ID:/libraries/include"
+    - "-IC:/Users/Carli/code/gproc/include"
+    - "-IC:/Users/Carli/code/gcui/include"
+    - "-IC:/Users/Carli/code/_libraries_/include"

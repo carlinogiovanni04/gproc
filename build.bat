@@ -3,7 +3,7 @@ setlocal
 pushd "%~dp0"
 
 if not defined CC set CC=clang-cl
-if not defined SDL_DIR set SDL_DIR=D:\libraries
+if not defined SDL_DIR set SDL_DIR=C:\Users\Carli\Code\_libraries_
 
 set OUT=bin\gproc.exe
 set INCLUDES=/I "include" /I "..\gcui\include" /I "%SDL_DIR%\include"
