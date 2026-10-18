@@ -1,7 +1,6 @@
 CompileFlags:
   Add:
-    - "-Wall"
-    - "-Wextra"
-    - "-Werror"
-    - "-I/home/giovanni/Work/Code/gproc/include"
-    - "-I/home/giovanni/Work/Code/gcui/include"
+    - "-std=c11"
+    - "-ID:/code/gproc/include"
+    - "-ID:/code/gcui/include"
+    - "-ID:/libraries/include"

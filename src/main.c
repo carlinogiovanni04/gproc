@@ -1,13 +1,12 @@
 #define GPROC_IMPLEMENTATION
-#include "proc.h"
 #include "gcui.h"
+#include "proc.h"
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <string.h>
-#include <signal.h>
 #include <float.h>
-
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 
 #define WIN_W 1280
 #define WIN_H 720
@@ -295,8 +294,13 @@ static void app_frame(App *a)
     gc_window_end(a->window);
 }
 
+#ifdef _WIN32
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+#else
 int main(void)
 {
+#endif
     if (!app_init(&app)) {
         return 1;
     }

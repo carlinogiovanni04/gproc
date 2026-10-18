@@ -63,13 +63,32 @@ header_implementation b32  proc_kill(i32 pid, i32 sig);
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
+
+#if defined(_WIN32)
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <psapi.h>
+#include <tlhelp32.h>
+
+#ifndef SIGTERM
+#define SIGTERM 15
+#endif
+#ifndef SIGKILL
+#define SIGKILL 9
+#endif
+
+#elif defined(__linux__)
+
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
-#include <ctype.h>
 
-#if !defined(__linux__)
-#error "gproc v1 is Linux-only (/proc)"
+#else
+#error "gproc supports Linux and Windows only"
 #endif
 
 typedef struct {
@@ -79,6 +98,85 @@ typedef struct {
 
 static i32 proc__key  = PROC_SORT_CPU;
 static b32 proc__desc = true;
+
+header_implementation b32 proc__contains_ci(const char *hay, const char *ndl)
+{
+    if (*ndl == '\0') {
+        return true;
+    }
+    for (; *hay; hay++) {
+        const char *h = hay;
+        const char *n = ndl;
+        while (*n && *h && tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
+            h++;
+            n++;
+        }
+        if (*n == '\0') {
+            return true;
+        }
+    }
+    return false;
+}
+
+header_implementation void proc__copy(char *dst, usize cap, const char *src)
+{
+    if (cap == 0) {
+        return;
+    }
+    usize i = 0;
+    while (i + 1 < cap && src[i] != '\0') {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
+}
+
+header_implementation i32 proc__cmp(const void *a, const void *b)
+{
+    const Proc *x = (const Proc *)a;
+    const Proc *y = (const Proc *)b;
+    i32         r = 0;
+    if (proc__key == PROC_SORT_CPU) {
+        r = (x->cpu_pct > y->cpu_pct) - (x->cpu_pct < y->cpu_pct);
+    } else if (proc__key == PROC_SORT_MEM) {
+        r = (x->rss_kb > y->rss_kb) - (x->rss_kb < y->rss_kb);
+    } else if (proc__key == PROC_SORT_NAME) {
+        r = (i32)strcmp(x->name, y->name);
+    } else {
+        r = (x->pid > y->pid) - (x->pid < y->pid);
+    }
+    return proc__desc ? -r : r;
+}
+
+header_implementation void proc_sort(Proc *procs, i32 count, i32 key, b32 desc)
+{
+    if (!procs || count < 2) {
+        return;
+    }
+    if (key < PROC_SORT_PID || key > PROC_SORT_NAME) {
+        key = PROC_SORT_PID;
+    }
+    proc__key  = key;
+    proc__desc = desc;
+    qsort(procs, (usize)count, sizeof(Proc), proc__cmp);
+}
+
+header_implementation b32 proc_match(const Proc *p, const char *filter)
+{
+    if (!p) {
+        return false;
+    }
+    if (!filter || *filter == '\0') {
+        return true;
+    }
+    return proc__contains_ci(p->name, filter) || proc__contains_ci(p->cmd, filter);
+}
+
+/* ------------------------------------------------------------------ */
+/* Linux (/proc)                                                       */
+/* ------------------------------------------------------------------ */
+
+#if defined(__linux__)
 
 header_implementation u64 proc__cpu_total(u64 *idle_out)
 {
@@ -120,58 +218,22 @@ header_implementation b32 proc__is_pid(const char *s)
     return true;
 }
 
-header_implementation b32 proc__contains_ci(const char *hay, const char *ndl)
-{
-    if (*ndl == '\0') {
-        return true;
-    }
-    for (; *hay; hay++) {
-        const char *h = hay;
-        const char *n = ndl;
-        while (*n && *h && tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
-            h++;
-            n++;
-        }
-        if (*n == '\0') {
-            return true;
-        }
-    }
-    return false;
-}
-
-header_implementation i32 proc__cmp(const void *a, const void *b)
-{
-    const Proc *x = (const Proc *)a;
-    const Proc *y = (const Proc *)b;
-    i32 r = 0;
-    if (proc__key == PROC_SORT_CPU) {
-        r = (x->cpu_pct > y->cpu_pct) - (x->cpu_pct < y->cpu_pct);
-    } else if (proc__key == PROC_SORT_MEM) {
-        r = (x->rss_kb > y->rss_kb) - (x->rss_kb < y->rss_kb);
-    } else if (proc__key == PROC_SORT_NAME) {
-        r = (i32)strcmp(x->name, y->name);
-    } else {
-        r = (x->pid > y->pid) - (x->pid < y->pid);
-    }
-    return proc__desc ? -r : r;
-}
-
 header_implementation b32 proc_snapshot(Proc *procs, i32 *count, SysInfo *sys)
 {
     if (!procs || !count || !sys) {
         return false;
     }
 
-    static u64 last_total = 0;
-    static u64 last_idle = 0;
+    static u64        last_total = 0;
+    static u64        last_idle  = 0;
     static Proc__Prev prev[PROC_MAX];
-    static i32 nprev = 0;
+    static i32        nprev = 0;
 
-    u64 idle = 0;
-    u64 total = proc__cpu_total(&idle);
+    u64 idle   = 0;
+    u64 total  = proc__cpu_total(&idle);
     u64 dtotal = (total > last_total) ? total - last_total : 0;
-    u64 didle = (idle > last_idle) ? idle - last_idle : 0;
-    b32 first = (last_total == 0);
+    u64 didle  = (idle > last_idle) ? idle - last_idle : 0;
+    b32 first  = (last_total == 0);
 
     sys->cpu_pct = 0.0f;
     if (!first && dtotal > 0) {
@@ -250,33 +312,35 @@ header_implementation b32 proc_snapshot(Proc *procs, i32 *count, SysInfo *sys)
         if (!lp || !rp || rp <= lp + 1) {
             continue;
         }
-        Proc *p = &procs[n];
+        Proc *p  = &procs[n];
         usize cn = (usize)(rp - lp - 1);
         if (cn > (usize)(PROC_NAME_MAX - 1)) {
             cn = (usize)(PROC_NAME_MAX - 1);
         }
         memcpy(p->name, lp + 1, cn);
-        p->name[cn] = '\0';
-        char state = 0;
-        int ppid = 0;
-        unsigned long ut = 0;
-        unsigned long st = 0;
-        long rss_pg = 0;
-        int m = sscanf(rp + 1, " %c %d %*d %*d %*d %*d %*u %*lu %*lu %*lu %*lu %lu %lu %*ld %*ld %*d %*d %*d %*d %*llu %*lu %ld",
-            &state, &ppid, &ut, &st, &rss_pg);
+        p->name[cn]          = '\0';
+        char          state  = 0;
+        int           ppid   = 0;
+        unsigned long ut     = 0;
+        unsigned long st     = 0;
+        long          rss_pg = 0;
+        int m = sscanf(rp + 1,
+                       " %c %d %*d %*d %*d %*d %*u %*lu %*lu %*lu %*lu %lu %lu %*ld %*ld %*d %*d "
+                       "%*d %*d %*llu %*lu %ld",
+                       &state, &ppid, &ut, &st, &rss_pg);
         if (m != 5) {
             continue;
         }
-        p->pid = pid;
-        p->ppid = (i32)ppid;
-        p->state = state;
+        p->pid      = pid;
+        p->ppid     = (i32)ppid;
+        p->state    = state;
         p->cpu_time = (u64)ut + (u64)st;
-        p->rss_kb = (rss_pg > 0) ? (u64)rss_pg * (u64)page_kb : 0;
-        p->cpu_pct = 0.0f;
+        p->rss_kb   = (rss_pg > 0) ? (u64)rss_pg * (u64)page_kb : 0;
+        p->cpu_pct  = 0.0f;
         if (!first && dtotal > 0) {
             for (i32 i = 0; i < nprev; i++) {
                 if (prev[i].pid == pid) {
-                    u64 dt = (p->cpu_time > prev[i].t) ? p->cpu_time - prev[i].t : 0;
+                    u64 dt     = (p->cpu_time > prev[i].t) ? p->cpu_time - prev[i].t : 0;
                     p->cpu_pct = 100.0f * (f32)dt / (f32)dtotal;
                     break;
                 }
@@ -312,37 +376,13 @@ header_implementation b32 proc_snapshot(Proc *procs, i32 *count, SysInfo *sys)
 
     for (i32 i = 0; i < n; i++) {
         prev[i].pid = procs[i].pid;
-        prev[i].t = procs[i].cpu_time;
+        prev[i].t   = procs[i].cpu_time;
     }
-    nprev = n;
+    nprev      = n;
     last_total = total;
-    last_idle = idle;
-    *count = n;
+    last_idle  = idle;
+    *count     = n;
     return true;
-}
-
-header_implementation void proc_sort(Proc *procs, i32 count, i32 key, b32 desc)
-{
-    if (!procs || count < 2) {
-        return;
-    }
-    if (key < PROC_SORT_PID || key > PROC_SORT_NAME) {
-        key = PROC_SORT_PID;
-    }
-    proc__key = key;
-    proc__desc = desc;
-    qsort(procs, (usize)count, sizeof(Proc), proc__cmp);
-}
-
-header_implementation b32 proc_match(const Proc *p, const char *filter)
-{
-    if (!p) {
-        return false;
-    }
-    if (!filter || *filter == '\0') {
-        return true;
-    }
-    return proc__contains_ci(p->name, filter) || proc__contains_ci(p->cmd, filter);
 }
 
 header_implementation b32 proc_kill(i32 pid, i32 sig)
@@ -352,6 +392,154 @@ header_implementation b32 proc_kill(i32 pid, i32 sig)
     }
     return kill((pid_t)pid, sig) == 0;
 }
+
+/* ------------------------------------------------------------------ */
+/* Windows (toolhelp / psapi)                                          */
+/* ------------------------------------------------------------------ */
+
+#elif defined(_WIN32)
+
+header_implementation u64 proc__ft(const FILETIME *ft)
+{
+    ULARGE_INTEGER u;
+    u.LowPart  = ft->dwLowDateTime;
+    u.HighPart = ft->dwHighDateTime;
+    return (u64)u.QuadPart;
+}
+
+header_implementation b32 proc_snapshot(Proc *procs, i32 *count, SysInfo *sys)
+{
+    if (!procs || !count || !sys) {
+        return false;
+    }
+
+    static u64        last_total = 0;
+    static u64        last_idle  = 0;
+    static Proc__Prev prev[PROC_MAX];
+    static i32        nprev = 0;
+
+    u64      idle  = 0;
+    u64      total = 0;
+    FILETIME fi, fk, fu;
+    if (GetSystemTimes(&fi, &fk, &fu)) {
+        idle  = proc__ft(&fi);
+        total = proc__ft(&fk) + proc__ft(&fu);
+    }
+    u64 dtotal = (total > last_total) ? total - last_total : 0;
+    u64 didle  = (idle > last_idle) ? idle - last_idle : 0;
+    b32 first  = (last_total == 0);
+
+    sys->cpu_pct = 0.0f;
+    if (!first && dtotal > 0) {
+        f32 busy = (f32)(dtotal - didle) / (f32)dtotal;
+        if (busy < 0.0f) {
+            busy = 0.0f;
+        }
+        if (busy > 1.0f) {
+            busy = 1.0f;
+        }
+        sys->cpu_pct = busy * 100.0f;
+    }
+
+    sys->mem_total_kb = 0;
+    sys->mem_avail_kb = 0;
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    if (GlobalMemoryStatusEx(&ms)) {
+        sys->mem_total_kb = (u64)(ms.ullTotalPhys / 1024ULL);
+        sys->mem_avail_kb = (u64)(ms.ullAvailPhys / 1024ULL);
+    }
+    u64 used = (sys->mem_total_kb > sys->mem_avail_kb) ? sys->mem_total_kb - sys->mem_avail_kb : 0;
+    sys->mem_pct = sys->mem_total_kb ? 100.0f * (f32)used / (f32)sys->mem_total_kb : 0.0f;
+
+    sys->uptime_s = (f64)GetTickCount64() / 1000.0;
+
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snap == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    PROCESSENTRY32 pe;
+    pe.dwSize = sizeof(pe);
+    i32 n     = 0;
+    if (Process32First(snap, &pe)) {
+        do {
+            if (n >= PROC_MAX) {
+                break;
+            }
+            DWORD pid   = pe.th32ProcessID;
+            Proc *p     = &procs[n];
+            p->pid      = (i32)pid;
+            p->ppid     = (i32)pe.th32ParentProcessID;
+            p->state    = '?';
+            p->cpu_time = 0;
+            p->cpu_pct  = 0.0f;
+            p->rss_kb   = 0;
+            proc__copy(p->name, sizeof(p->name), pe.szExeFile);
+            proc__copy(p->cmd, sizeof(p->cmd), p->name);
+
+            HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+            if (h) {
+                FILETIME ct, et, kt, ut;
+                if (GetProcessTimes(h, &ct, &et, &kt, &ut)) {
+                    p->cpu_time = proc__ft(&kt) + proc__ft(&ut);
+                }
+                DWORD cap = (DWORD)sizeof(p->cmd);
+                if (!QueryFullProcessImageNameA(h, 0, p->cmd, &cap) || p->cmd[0] == '\0') {
+                    proc__copy(p->cmd, sizeof(p->cmd), p->name);
+                }
+                CloseHandle(h);
+            }
+
+            HANDLE mh = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+            if (mh) {
+                PROCESS_MEMORY_COUNTERS pmc;
+                if (GetProcessMemoryInfo(mh, &pmc, sizeof(pmc))) {
+                    p->rss_kb = (u64)(pmc.WorkingSetSize / 1024ULL);
+                }
+                CloseHandle(mh);
+            }
+
+            if (!first && dtotal > 0) {
+                for (i32 i = 0; i < nprev; i++) {
+                    if (prev[i].pid == p->pid) {
+                        u64 dt     = (p->cpu_time > prev[i].t) ? p->cpu_time - prev[i].t : 0;
+                        p->cpu_pct = 100.0f * (f32)dt / (f32)dtotal;
+                        break;
+                    }
+                }
+            }
+            n++;
+        } while (Process32Next(snap, &pe));
+    }
+    CloseHandle(snap);
+
+    for (i32 i = 0; i < n; i++) {
+        prev[i].pid = procs[i].pid;
+        prev[i].t   = procs[i].cpu_time;
+    }
+    nprev      = n;
+    last_total = total;
+    last_idle  = idle;
+    *count     = n;
+    return true;
+}
+
+header_implementation b32 proc_kill(i32 pid, i32 sig)
+{
+    if (pid <= 0 || sig <= 0) {
+        return false;
+    }
+    HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, (DWORD)pid);
+    if (!h) {
+        return false;
+    }
+    b32 ok = TerminateProcess(h, (UINT)sig) ? true : false;
+    CloseHandle(h);
+    return ok;
+}
+
+#endif
 
 #endif
 #endif
