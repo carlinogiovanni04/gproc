@@ -190,6 +190,10 @@ static void frame(void)
         scroll.offset = FLT_MAX;
     }
 
+    b32    has_bar = (f32)nshow * ROW_H > bodyH;
+    f32    barW    = 10.0f;
+    GCRECT bar     = {rowX + rowW - barW, bodyY, barW, bodyH};
+
     gc_ui_scroll_begin(ui, &scroll, (GCRECT){MARGIN, bodyY, w - 2.0f * MARGIN, bodyH},
                        (f32)nshow * ROW_H, ROW_H * 3.0f);
 
@@ -204,6 +208,9 @@ static void frame(void)
         f32    y      = bodyY + (f32)(vi - first) * ROW_H;
         GCRECT row    = {rowX, y, rowW, ROW_H};
         GCB32  inside = gc_rect_contains(row, ui->mouseX, ui->mouseY);
+        if (has_bar && gc_rect_contains(bar, ui->mouseX, ui->mouseY)) {
+            inside = GC_FALSE;
+        }
 
         if (p->pid == sel) {
             gc_draw_fill(window, row, C_SEL);
