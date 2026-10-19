@@ -256,10 +256,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 int main(void)
 #endif
 {
+#ifdef _WIN32
     (void)hInstance;
     (void)hPrevInstance;
     (void)lpCmdLine;
     (void)nCmdShow;
+#endif
     arena  = gc_arena_create(GC_MB(2));
     window = gc_window_create(arena, "gproc", 1280, 720, GC_FALSE);
     if (!window) {
